@@ -1,0 +1,41 @@
+{
+  "overview": "A simple three-tier todo list application consisting of a React frontend (SPA) that communicates with a Go backend API, which persists data in PostgreSQL. The frontend sends HTTP requests to the backend service for CRUD operations on tasks, and the backend handles business logic and database interactions.",
+  "requirements": [
+    "Users must be able to create new todo items with a text description",
+    "Users must be able to view all their todo items in a list",
+    "Users must be able to toggle todo items between complete and incomplete states",
+    "Users must be able to delete todo items",
+    "The UI must visually distinguish between completed and incomplete todos",
+    "The backend API must persist all todo data in PostgreSQL",
+    "All services must expose a /health endpoint for readiness checks",
+    "The frontend must be a single-page application built with React",
+    "The backend must provide RESTful API endpoints for todo CRUD operations"
+  ],
+  "components": [
+    {
+      "name": "todo-api",
+      "componentType": "service",
+      "language": "Go",
+      "dependsOn": [],
+      "entrypoint": "deployment/service",
+      "buildpack": "docker",
+      "appPath": "/todo-api",
+      "openAPISpec": "openapi: 3.0.3\ninfo:\n  title: Todo API\n  version: 1.0.0\n  description: RESTful API for managing todo items\npaths:\n  /health:\n    get:\n      summary: Health check endpoint\n      responses:\n        '200':\n          description: Service is healthy\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  status:\n                    type: string\n                    example: ok\n  /todos:\n    get:\n      summary: Get all todos\n      responses:\n        '200':\n          description: List of all todos\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: '#/components/schemas/Todo'\n    post:\n      summary: Create a new todo\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required:\n                - text\n              properties:\n                text:\n                  type: string\n                  minLength: 1\n                  maxLength: 500\n      responses:\n        '201':\n          description: Todo created successfully\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/Todo'\n        '400':\n          description: Invalid input\n  /todos/{id}:\n    patch:\n      summary: Update todo completion status\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema:\n            type: integer\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required:\n                - completed\n              properties:\n                completed:\n                  type: boolean\n      responses:\n        '200':\n          description: Todo updated successfully\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/Todo'\n        '404':\n          description: Todo not found\n        '400':\n          description: Invalid input\n    delete:\n      summary: Delete a todo\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema:\n            type: integer\n      responses:\n        '204':\n          description: Todo deleted successfully\n        '404':\n          description: Todo not found\ncomponents:\n  schemas:\n    Todo:\n      type: object\n      properties:\n        id:\n          type: integer\n          example: 1\n        text:\n          type: string\n          example: Buy groceries\n        completed:\n          type: boolean\n          example: false\n        created_at:\n          type: string\n          format: date-time\n          example: '2024-01-15T10:30:00Z'\n      required:\n        - id\n        - text\n        - completed\n        - created_at",
+      "componentAgentInstructions": "Implement a Go backend service using net/http that listens on port 9090. Use the pgx library to connect to PostgreSQL. Environment variables: DATABASE_URL (PostgreSQL connection string). Create a 'todos' table with columns: id (serial primary key), text (varchar 500), completed (boolean default false), created_at (timestamp default now()). Implement handlers for: GET /health (return {\"status\":\"ok\"}), GET /todos (return all todos as JSON array), POST /todos (accept {\"text\":\"...\"}, validate text is 1-500 chars, insert into DB, return created todo with 201), PATCH /todos/{id} (accept {\"completed\":true/false}, update the row, return updated todo or 404), DELETE /todos/{id} (delete the row, return 204 or 404). Use proper HTTP status codes. Enable CORS for all origins. Handle database connection errors gracefully. Log all requests. Use prepared statements to prevent SQL injection. On startup, ensure the todos table exists (create if missing). Return proper JSON error messages for 400/404 responses."
+    },
+    {
+      "name": "todo-web",
+      "componentType": "web-app",
+      "language": "TypeScript / React",
+      "dependsOn": [
+        "todo-api"
+      ],
+      "entrypoint": "deployment/web-application",
+      "buildpack": "docker",
+      "appPath": "/todo-web",
+      "openAPISpec": "openapi: 3.0.3\ninfo:\n  title: Todo Web Application\n  version: 1.0.0\n  description: Frontend SPA for todo list management\npaths:\n  /:\n    get:\n      summary: Serve the React application\n      responses:\n        '200':\n          description: HTML page with React app\n          content:\n            text/html:\n              schema:\n                type: string\n  /health:\n    get:\n      summary: Health check endpoint\n      responses:\n        '200':\n          description: Service is healthy\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  status:\n                    type: string\n                    example: ok",
+      "componentAgentInstructions": "Create a React 18+ single-page application using TypeScript, Vite as the build tool, and a simple Node.js/Express server to serve the static files in production. The server should listen on port 8080 and serve the built React app from a 'dist' directory. Implement a /health endpoint that returns {\"status\":\"ok\"}. The React app should: use functional components with hooks, maintain todo state using useState, fetch todos from todo-api on mount via GET /todos, display todos in a list with checkboxes and delete buttons, show completed todos with strikethrough text styling, allow adding new todos via a text input and submit button (POST /todos with {\"text\":\"...\"}), toggle completion via checkbox clicks (PATCH /todos/{id} with {\"completed\":true/false}), delete todos via delete button clicks (DELETE /todos/{id}). Use fetch API for all HTTP requests. Read the todo-api base URL from environment variable REACT_APP_API_URL (default to http://localhost:9090 for development). Show loading states during API calls. Display error messages if API calls fail. Validate that todo text is not empty before submitting. Use CSS modules or styled-components for styling. Create a clean, responsive UI. The Docker container should run 'npm run build' to create production assets, then serve them with the Express server. Include a Dockerfile that uses multi-stage build: build stage with node:18 to run 'npm install' and 'npm run build', then runtime stage with node:18-slim to run the Express server."
+    }
+  ],
+  "sourceSpec": "spec-v1"
+}
